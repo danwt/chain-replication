@@ -1,6 +1,6 @@
-# primary-backup-replication
+# chain-replication
 
-TLA+ for primary backup replication.
+TLA+ for chain replication.
 
 ```bash
 # Check
