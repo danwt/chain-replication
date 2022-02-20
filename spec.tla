@@ -47,8 +47,6 @@ VARIABLES
     \* @type: Int; Bound retries for model checking tractability
     retries
 
-
-
 Max(S) == CHOOSE e \in S : \A other \in S : other <= e
 Min(S) == CHOOSE e \in S : \A other \in S : e <= other
 Succ(servers_, p) == LET LT == {e \in servers_ : e < p} IN IF LT = {} THEN p ELSE Max(LT)
@@ -113,7 +111,6 @@ ReceiveSync ==
         /\ value' = [value EXCEPT ![p] = IF prev = pred THEN m.value ELSE @]
         /\ UNCHANGED retries
 
-
 ReceiveUpdateHist ==
     \E p \in SERVERS:
     /\ ~crashed[p]
@@ -168,7 +165,6 @@ Next ==
     \/ /\ ClientSucceed
        /\ action' = "clientSucceed"
 
-
 (*It _should_ be possible to find counterexamples for these.*)
 Sanity0  == response = NullInt
 Sanity1  == value[CLIENT] = NullInt
@@ -186,6 +182,5 @@ Agreement ==
         /\ value[CLIENT] = TARGET_VALUE
 
 Inv == Agreement
-
 
 ====
