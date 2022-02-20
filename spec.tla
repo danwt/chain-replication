@@ -47,6 +47,8 @@ VARIABLES
     \* @type: Int; Bound retries for model checking tractability
     retries
 
+
+
 Max(S) == CHOOSE e \in S : \A other \in S : other <= e
 Min(S) == CHOOSE e \in S : \A other \in S : e <= other
 Succ(servers_, p) == LET LT == {e \in servers_ : e < p} IN IF LT = {} THEN p ELSE Max(LT)
@@ -170,14 +172,13 @@ Next ==
 (*It _should_ be possible to find counterexamples for these.*)
 Sanity0  == response = NullInt
 Sanity1  == value[CLIENT] = NullInt
-Sanity2  == action # "fail"
-Sanity3  == action # "notifyFail"
-Sanity4  == action # "receiveSync"
-Sanity5  == action # "receiveUpdateHist"
-Sanity6  == action # "clientSend"
-Sanity7 == action # "clientSucceed"
-
-Sanity8 == \A k \in DOMAIN fifo : Len(fifo[k]) < 3
+Sanity2  == \E p \in SERVERS \cup {CLIENT}: value[p] # TARGET_VALUE
+Sanity3  == action # "fail"
+Sanity4  == action # "notifyFail"
+Sanity5  == action # "receiveSync"
+Sanity6  == action # "receiveUpdateHist"
+Sanity7  == action # "clientSend"
+Sanity8 == action # "clientSucceed"
 
 Agreement ==
     value[CLIENT] # NullInt => 
