@@ -43,7 +43,9 @@ VARIABLES
     \* @type: Int; 
     response,
     \* @type: PID -> Int;
-    value
+    value,
+    \* @type: Int; Bound retries for model checking tractability
+    retries
 
 Max(S) == CHOOSE e \in S : \A other \in S : other <= e
 Min(S) == CHOOSE e \in S : \A other \in S : e <= other
@@ -57,6 +59,7 @@ Init ==
     /\ servers = [p \in (SERVERS \cup {CLIENT}) |-> SERVERS]
     /\ response = NullInt
     /\ value = [p \in (SERVERS \cup {CLIENT}) |-> NullInt]
+    /\ retries = 0
 
 Fail ==
     \E p, pCorrect \in SERVERS: 
@@ -69,6 +72,7 @@ Fail ==
     /\ UNCHANGED servers
     /\ UNCHANGED response
     /\ UNCHANGED value
+    /\ UNCHANGED retries
 
 NotifyFail ==
     \E p \in SERVERS \cup {CLIENT}, pCrashed \in SERVERS:
@@ -81,6 +85,7 @@ NotifyFail ==
     /\ servers' = [servers EXCEPT ![p] = @ \ {pCrashed}]
     /\ UNCHANGED response
     /\ UNCHANGED value
+    /\ UNCHANGED retries
 
 ReceiveSync ==
     \E p, prev \in SERVERS:
@@ -89,17 +94,22 @@ ReceiveSync ==
     /\ 0 < Len(fifo[prev, p])
     /\ LET 
         m == Head(fifo[prev, p])
+        servers_ == [servers EXCEPT ![p] = {e \in @ : e <= p \/ prev <= e}]
+        IN LET
+        succ == Succ(servers_[p], p)
+        pred == Pred(servers_[p], p)
         IN
         /\ m.nature = _sync
         /\ UNCHANGED crashed
         /\ fifo' = [
                 fifo EXCEPT 
                 ![prev, p] = Tail(@),
-                ![p, Succ(servers', p)] = IF prev = Pred(servers', p) /\ p # Succ(servers', p) THEN @ \o <<sync(m.value)>> ELSE @
+                ![p, succ] = IF prev = pred /\ p # succ THEN @ \o <<sync(m.value)>> ELSE @
             ]
-        /\ servers' = [servers EXCEPT ![p] = {e \in @ : e <= p \/ prev <= e}]
-        /\ response' = IF prev = Pred(servers', p) /\ p = Succ(servers', p) THEN m.value ELSE response
-        /\ value' = [value EXCEPT ![p] = IF prev = Pred(servers', p) THEN m.value ELSE @]
+        /\ servers' = servers_
+        /\ response' = IF prev = pred /\ p = succ THEN m.value ELSE response
+        /\ value' = [value EXCEPT ![p] = IF prev = pred THEN m.value ELSE @]
+        /\ UNCHANGED retries
 
 
 ReceiveUpdateHist ==
@@ -108,25 +118,30 @@ ReceiveUpdateHist ==
     /\ 0 < Len(fifo[CLIENT, p])
     /\ LET
         m == Head(fifo[CLIENT, p])
+        servers_ == [servers EXCEPT ![p] = {e \in @ : e <= p}]
+        IN LET
+        succ == Succ(servers_[p], p)
         IN
         /\ UNCHANGED crashed
         /\ fifo' = [
                 fifo EXCEPT 
                 ![CLIENT, p] = Tail(@),
-                ![p, Succ(servers', p)] = IF Succ(servers', p) = p THEN @ ELSE @ \o <<sync(m.value)>>
+                ![p, succ] = IF succ = p THEN @ ELSE @ \o <<sync(m.value)>>
             ]
-        /\ servers' = [servers EXCEPT ![p] = {e \in @ : e <= p}]
-        /\ response' = IF Succ(servers', p) = p THEN m.value ELSE response
+        /\ servers' = servers_
+        /\ response' = IF succ = p THEN m.value ELSE response
         /\ value' = [value EXCEPT ![p] = m.value]
+        /\ UNCHANGED retries
 
 ClientSend == 
-    (*There's no need to explicitly model timeout and retry*)
     LET head == CHOOSE e \in servers[CLIENT] : (\A x \in servers[CLIENT] : x <= e) IN
+    /\ retries < Cardinality(SERVERS)
     /\ UNCHANGED crashed
     /\ fifo' = [fifo EXCEPT ![CLIENT, head] = @ \o <<updateHist(TARGET_VALUE)>>]
     /\ UNCHANGED servers
     /\ UNCHANGED response
     /\ UNCHANGED value
+    /\ retries' = retries + 1
 
 ClientSucceed == 
     /\ response # NullInt
@@ -135,6 +150,7 @@ ClientSucceed ==
     /\ UNCHANGED servers
     /\ UNCHANGED response
     /\ value' = [value EXCEPT ![CLIENT] = response]
+    /\ UNCHANGED retries
 
 Next ==
     \/ /\ Fail
@@ -153,19 +169,22 @@ Next ==
 
 (*It _should_ be possible to find counterexamples for these.*)
 Sanity0  == response = NullInt
-Sanity1  == action # "fail"
-Sanity2  == action # "notifyFail"
+Sanity1  == value[CLIENT] = NullInt
+Sanity2  == action # "fail"
+Sanity3  == action # "notifyFail"
 Sanity4  == action # "receiveSync"
 Sanity5  == action # "receiveUpdateHist"
 Sanity6  == action # "clientSend"
 Sanity7 == action # "clientSucceed"
+
+Sanity8 == \A k \in DOMAIN fifo : Len(fifo[k]) < 3
 
 Agreement ==
     value[CLIENT] # NullInt => 
         /\ \A p \in SERVERS: crashed[p] \/ value[p] = TARGET_VALUE
         /\ value[CLIENT] = TARGET_VALUE
 
-Inv == Sanity0
+Inv == Agreement
 
 
 ====
