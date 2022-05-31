@@ -1,6 +1,6 @@
 # chain-replication
 
-TLA+ for chain replication.
+TLA+ for [chain replication](https://danwt.github.io/message_passing/2022/02/20/0.html).
 
 ```bash
 # Check
